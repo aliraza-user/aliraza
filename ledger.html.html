@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal Ledgers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #F4F6F8;
+    --paper-alt: #E9EDF2;
+    --ink: #17324D;
+    --ink-soft: #5A7089;
+    --rule: #D6DDE4;
+    --ledger-green: #14385F;
+    --ledger-green-dark: #0B2540;
+    --gold: #C9A24B;
+    --red: #B3382C;
+    --tab-idle: #DCE3EA;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Source Sans 3', sans-serif;
+    min-height:100vh;
+  }
+  .wrap{
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 36px 20px 60px;
+  }
+  #zoomArea{
+    transform-origin: top left;
+    width: 100%;
+  }
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    background: linear-gradient(135deg, var(--ledger-green-dark) 0%, var(--ledger-green) 100%);
+    border-radius: 10px 10px 0 0;
+    padding: 20px 24px 18px;
+    margin-bottom: 0;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .title-block h1{
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 34px;
+    margin: 0;
+    letter-spacing: -0.01em;
+    color: #FFFFFF;
+  }
+  .title-block .sub{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #AEC2D6;
+    margin-top: 4px;
+  }
+  .status{
+    text-align:right;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: #AEC2D6;
+  }
+  .status button{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    background: var(--gold);
+    color: var(--ledger-green-dark);
+    border: none;
+    padding: 7px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    margin-top: 6px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .status button:hover{ background: #B8923E; }
+  .status button:disabled{ opacity: 0.5; cursor: default; }
+
+  .zoom-controls{
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-top: 6px;
+    margin-right: 8px;
+  }
+  .zoom-controls button{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    background: transparent;
+    color: var(--ledger-green);
+    border: 1px solid var(--ledger-green);
+    width: 26px;
+    height: 26px;
+    line-height: 1;
+    border-radius: 3px;
+    cursor: pointer;
+    padding: 0;
+  }
+  .zoom-controls button:hover{ background: var(--ledger-green); color: var(--paper); }
+  .zoom-controls span{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    min-width: 38px;
+    text-align: center;
+  }
+  .landscape-btn{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    background: transparent;
+    color: #AEC2D6;
+    border: 1px solid #3E5A78;
+    padding: 6px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    display: inline-block; /* always available, not just on narrow portrait screens */
+  }
+  .landscape-btn:hover{ background: rgba(255,255,255,0.1); color: #fff; }
+  .landscape-btn.active{ background: var(--gold); color: var(--ledger-green-dark); border-color: var(--gold); }
+
+  body.landscape-mode{
+    overflow-x: hidden;
+  }
+  body.landscape-mode #zoomArea{
+    position: fixed;
+    top: 0;
+    left: 100%;
+    width: 100vh;
+    height: 100vw;
+    transform-origin: top left;
+    transform: rotate(90deg);
+    overflow-y: auto;
+    padding: 0 20px 40px;
+  }
+  body.landscape-mode header,
+  body.landscape-mode footer{
+    display: none;
+  }
+  body.landscape-mode .wrap{
+    padding: 0;
+    max-width: none;
+  }
+
+  .ledger-controls{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--ledger-green-dark);
+    flex-wrap: wrap;
+  }
+  .ledger-controls .landscape-btn{
+    color: #C7D6E4;
+    border-color: #3E5A78;
+  }
+  .inline-zoom{ margin: 0; }
+  .inline-zoom button{ color: #FFFFFF; border-color: #6E8CA8; }
+  .inline-zoom button:hover, .inline-zoom button:active{ background: var(--gold); color: var(--ledger-green-dark); border-color: var(--gold); }
+  .inline-zoom span{ color: #C7D6E4; }
+
+  .month-controls{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 12px;
+    background: var(--paper-alt);
+    border-bottom: 1px solid var(--rule);
+  }
+  .month-btn{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    background: var(--paper);
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+    padding: 6px 12px;
+    border-radius: 14px;
+    cursor: pointer;
+  }
+  .month-btn:hover{ border-color: var(--ledger-green); color: var(--ledger-green); }
+  .month-btn.active{
+    background: var(--ledger-green);
+    color: var(--paper);
+    border-color: var(--ledger-green);
+    font-weight: 600;
+  }
+  .status-row{
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .tabs{
+    display:flex;
+    gap: 3px;
+    margin-top: -1px;
+    flex-wrap: wrap;
+  }
+  .tab{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    padding: 10px 16px 9px;
+    background: var(--tab-idle);
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    position: relative;
+    top: 1px;
+    transition: transform 0.12s ease, background 0.12s ease;
+  }
+  .tab:hover{ transform: translateY(-2px); }
+  .tab.active{
+    background: var(--paper);
+    color: var(--ink);
+    font-weight: 600;
+    border-color: var(--ink-soft);
+    border-top: 2px solid var(--gold);
+    border-bottom: 1px solid var(--paper);
+  }
+
+  .panel{
+    border: 1px solid var(--ink);
+    border-top: none;
+    background: var(--paper);
+    min-height: 320px;
+    padding: 6px 0 0;
+    position: relative;
+  }
+
+  .summary-box{
+    padding: 14px 18px;
+    border-bottom: 2px solid var(--ink);
+    background: var(--paper-alt);
+  }
+  .summary-title{
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 17px;
+    margin-bottom: 10px;
+  }
+  .summary-stats{
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .stat{
+    display: flex;
+    flex-direction: column;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .stat-label{
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    margin-bottom: 3px;
+  }
+  .stat-val{
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .stat.highlight .stat-val{ color: var(--ledger-green); }
+
+  .table-scroll{
+    overflow: auto;
+    max-height: 65vh;
+  }
+  .ledger-table{
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+  }
+  .ledger-table thead th{
+    text-align: left;
+    font-family: 'Source Sans 3', sans-serif;
+    font-weight: 600;
+    font-size: 10.5px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--paper);
+    background: var(--ledger-green);
+    padding: 6px 10px;
+    position: sticky;
+    top: 0;
+  }
+  .ledger-table thead th.center{ text-align: center; }
+  .ledger-table tbody td{
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  .ledger-table tbody tr:nth-child(even){ background: var(--paper-alt); }
+  .ledger-table tbody tr:hover{ background: #E5DCC0; }
+  .ledger-table tfoot td{
+    padding: 7px 10px;
+    font-weight: 700;
+    background: var(--paper-alt);
+    border-top: 2px solid var(--ledger-green);
+    white-space: nowrap;
+  }
+  .num{ text-align: right; font-variant-numeric: tabular-nums; }
+  .neg{ color: var(--red); }
+
+  .state{
+    display:flex;
+    flex-direction: column;
+    align-items:center;
+    justify-content:center;
+    padding: 70px 20px;
+    color: var(--ink-soft);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    text-align: center;
+  }
+  .state .mark{
+    width: 34px; height: 34px;
+    border: 2px solid var(--ledger-green);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+    margin-bottom: 14px;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+  .state.error{ color: var(--red); }
+  .state.error .mark{ display:none; }
+
+  footer{
+    margin-top: 22px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-align: center;
+  }
+
+  @media (max-width: 600px){
+    .title-block h1{ font-size: 26px; }
+    header{ flex-direction: column; align-items: flex-start; }
+    .status{ text-align: left; }
+    .ledger-table{ font-size: 11px; }
+    .ledger-table thead th, .ledger-table tbody td{ padding: 5px 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title-block">
+      <h1>Personal Ledgers</h1>
+      <div class="sub">Live account records</div>
+    </div>
+    <div class="status">
+      <div class="status-row">
+        <button id="landscapeBtn" class="landscape-btn" title="Rotate to landscape view">&#8635; Landscape</button>
+        <button id="refreshBtn">Refresh now</button>
+      </div>
+      <div id="lastUpdated">Loading&hellip;</div>
+    </div>
+  </header>
+
+  <div id="zoomArea">
+    <div class="tabs" id="tabs"></div>
+    <div class="ledger-controls">
+      <button id="landscapeToggleBtn" class="landscape-btn" title="Rotate to landscape view">&#8635; Landscape</button>
+      <div class="zoom-controls inline-zoom">
+        <button id="zoomOutBtn" title="Zoom out">&minus;</button>
+        <span id="zoomLevel">100%</span>
+        <button id="zoomInBtn" title="Zoom in">&plus;</button>
+      </div>
+    </div>
+    <div class="month-controls" id="monthControls"></div>
+    <div class="panel" id="panel">
+      <div class="state"><div class="mark"></div>Fetching ledger&hellip;</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const SHEET_ID = "1FsCmq1fJ1qPlvvrsbAXiZ_xbph5uoi0rfLAZ7_Q2DM0";
+  const LEDGERS = [
+    { name: "KASHIF SB", gid: "627875839" },
+    { name: "AQIL SB", gid: "1086989703" },
+    { name: "RASHID SB", gid: "1122812135" },
+    { name: "ASIF SB", gid: "1985525514" },
+    { name: "MISS SARWAT", gid: "944226346" }
+  ];
+  const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
+
+  let activeIndex = 0;
+  let cache = {};
+
+  function csvUrl(gid){
+    return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${gid}`;
+  }
+
+  // Minimal RFC4180-ish CSV parser (handles quoted fields, commas, newlines inside quotes)
+  function parseCSV(text){
+    const rows = [];
+    let row = [];
+    let field = '';
+    let inQuotes = false;
+    for(let i = 0; i < text.length; i++){
+      const c = text[i];
+      if(inQuotes){
+        if(c === '"'){
+          if(text[i+1] === '"'){ field += '"'; i++; }
+          else { inQuotes = false; }
+        } else {
+          field += c;
+        }
+      } else {
+        if(c === '"'){ inQuotes = true; }
+        else if(c === ','){ row.push(field); field = ''; }
+        else if(c === '\n'){ row.push(field); rows.push(row); row = []; field = ''; }
+        else if(c === '\r'){ /* skip */ }
+        else { field += c; }
+      }
+    }
+    if(field.length || row.length){ row.push(field); rows.push(row); }
+    return rows.filter(r => r.some(c => c.trim() !== ''));
+  }
+
+  function isNumeric(str){
+    if(str === undefined || str === null) return false;
+    const s = str.replace(/,/g, '').trim();
+    if(s === '') return false;
+    return !isNaN(s) && !isNaN(parseFloat(s));
+  }
+
+  // Finds a label cell (e.g. "TOTAL DEBIT") anywhere in the sheet and returns the cell right after it
+  function findLabelValue(rows, labelRegex){
+    for(const row of rows){
+      for(let i = 0; i < row.length; i++){
+        if(labelRegex.test((row[i] || '').trim())){
+          return (row[i+1] || '').trim();
+        }
+      }
+    }
+    return '';
+  }
+
+  function findAccountTitle(rows){
+    for(let r = 0; r < Math.min(rows.length, 3); r++){
+      for(const cell of rows[r]){
+        const c = (cell || '').trim();
+        if(c.length > 8){
+          let name = c.split('|')[0].trim();
+          // Drop a trailing company name (e.g. "ABC PRIVATE LIMITED") so only the person's name shows
+          name = name.replace(/\s+ABC\s+PRIVATE\s+LIMITED\s*$/i, '').trim();
+          return name;
+        }
+      }
+    }
+    return '';
+  }
+
+  // Parses the ledger's real shape: a DESCRIPTION-anchored header, with data rows
+  // shifted one column right (they carry a leading serial number the header doesn't label).
+  function parseLedgerSheet(rows){
+    let headerRowIdx = -1, descColIdx = -1;
+    for(let r = 0; r < rows.length; r++){
+      const idx = rows[r].findIndex(c => (c || '').trim().toUpperCase() === 'DESCRIPTION');
+      if(idx !== -1){ headerRowIdx = r; descColIdx = idx; break; }
+    }
+
+    if(headerRowIdx === -1){
+      // Fallback: couldn't find the expected layout, show a plain table instead
+      return { plain: true };
+    }
+
+    const cols = [
+      { key: 'date', label: 'Date', offset: -2 },
+      { key: 'ref', label: 'Entry #', offset: -1 },
+      { key: 'desc', label: 'Description', offset: 0 },
+      { key: 'reference', label: 'Reference', offset: 1 },
+      { key: 'mode', label: 'Mode of Payment', offset: 2 },
+      { key: 'expenses', label: 'Expenses', offset: 3 },
+      { key: 'receipts', label: 'Receipts', offset: 4 },
+      { key: 'balance', label: 'Balance', offset: 5 }
+    ];
+
+    const transactions = [];
+    let lastDate = '';
+    for(let r = headerRowIdx + 1; r < rows.length; r++){
+      const row = rows[r];
+      const rec = {};
+      cols.forEach(c => { rec[c.key] = (row[descColIdx + c.offset] || '').trim(); });
+      if(rec.desc){
+        if(rec.date) lastDate = rec.date; else rec.date = lastDate;
+        transactions.push(rec);
+      }
+    }
+
+    return {
+      plain: false,
+      cols,
+      transactions,
+      title: findAccountTitle(rows),
+      totalDebit: findLabelValue(rows, /^TOTAL DEBIT$/i),
+      totalCredit: findLabelValue(rows, /^TOTAL CREDIT$/i),
+      closingBalance: findLabelValue(rows, /^CLOSING BALANCE$/i)
+    };
+  }
+
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // Parses dates like "04-Aug-2026" or "04-Aug-26". Returns {month, year} or null
+  // (e.g. for "OPENING" rows, which aren't real dates and are excluded from monthly filters).
+  function parseTxDate(str){
+    if(!str) return null;
+    const m = str.trim().match(/^(\d{1,2})[-\/]([A-Za-z]{3,})[-\/](\d{2,4})$/);
+    if(!m) return null;
+    const monthIdx = MONTH_NAMES.findIndex(mo => mo.toLowerCase() === m[2].slice(0,3).toLowerCase());
+    if(monthIdx === -1) return null;
+    let year = parseInt(m[3], 10);
+    if(year < 100) year += 2000;
+    return { month: monthIdx, year };
+  }
+
+  function numVal(str){
+    if(!str || str === '-' || str === '—') return 0;
+    const n = parseFloat(String(str).replace(/,/g, ''));
+    return isNaN(n) ? 0 : n;
+  }
+
+  // Finds the balance carried by the most recent transaction in a set, using the
+  // Entry # column rather than array position — some sheets list rows oldest-first,
+  // others newest-first, so array position alone isn't a reliable way to find "latest".
+  function latestBalanceOf(transactions){
+    if(!transactions || transactions.length === 0) return '';
+    let best = transactions[0], bestRef = numVal(best.ref);
+    for(const t of transactions){
+      const r = numVal(t.ref);
+      if(r >= bestRef){ bestRef = r; best = t; }
+    }
+    return best.balance;
+  }
+
+  // Sorts a set of transactions oldest-first (opening balance row first, then
+  // ascending through time), using Entry # as the primary key — since entries are
+  // assigned sequentially, this works regardless of how the sheet rows are ordered.
+  // Falls back to date if Entry # is missing or tied.
+  function sortChronological(transactions){
+    return [...transactions].sort((a, b) => {
+      const refA = numVal(a.ref), refB = numVal(b.ref);
+      if(refA !== refB) return refA - refB;
+      const dA = parseTxDate(a.date), dB = parseTxDate(b.date);
+      if(dA && dB){
+        if(dA.year !== dB.year) return dA.year - dB.year;
+        return dA.month - dB.month;
+      }
+      return 0;
+    });
+  }
+
+  function fmtNum(n){
+    return Math.round(n).toLocaleString('en-US');
+  }
+
+  // Last 3 months + current month, computed from today's date, plus "Complete Ledger".
+  function getMonthOptions(){
+    const now = new Date();
+    const opts = [{ key: 'complete', label: 'Complete Ledger' }];
+    for(let i = 3; i >= 0; i--){
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      opts.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: `${MONTH_NAMES[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}` });
+    }
+    return opts;
+  }
+
+  let selectedMonthKey = 'complete';
+
+  function renderMonthControls(){
+    const el = document.getElementById('monthControls');
+    el.innerHTML = getMonthOptions().map(opt =>
+      `<button class="month-btn${opt.key === selectedMonthKey ? ' active' : ''}" data-key="${opt.key}">${escapeHtml(opt.label)}</button>`
+    ).join('');
+    el.querySelectorAll('.month-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedMonthKey = btn.dataset.key;
+        renderMonthControls();
+        renderPanel();
+      });
+    });
+  }
+
+  function renderSummary(stats){
+    if(!stats.title && !stats.closingBalance) return '';
+    const balanceLabel = stats.balanceLabel || 'Closing Balance';
+    return `
+      <div class="summary-box">
+        ${stats.title ? `<div class="summary-title">${escapeHtml(stats.title)}</div>` : ''}
+        <div class="summary-stats">
+          ${stats.totalDebit ? `<div class="stat"><span class="stat-label">Total Payments</span><span class="stat-val">${escapeHtml(stats.totalDebit)}</span></div>` : ''}
+          ${stats.totalCredit ? `<div class="stat"><span class="stat-label">Total Receipts</span><span class="stat-val">${escapeHtml(stats.totalCredit)}</span></div>` : ''}
+          ${stats.closingBalance ? `<div class="stat highlight"><span class="stat-label">${escapeHtml(balanceLabel)}</span><span class="stat-val">${escapeHtml(stats.closingBalance)}</span></div>` : ''}
+        </div>
+      </div>`;
+  }
+
+  function renderTable(rows){
+    // Fallback plain renderer, used only if the DESCRIPTION anchor isn't found
+    if(!rows || rows.length === 0){
+      return `<div class="state">No rows found in this ledger yet.</div>`;
+    }
+    const [header, ...body] = rows;
+    const centerHeaders = ['expenses', 'receipts', 'balance'];
+    let html = '<div class="table-scroll"><table class="ledger-table"><thead><tr>';
+    header.forEach(h => html += `<th class="${centerHeaders.includes((h || '').trim().toLowerCase()) ? 'center' : ''}">${escapeHtml(h)}</th>`);
+    html += '</tr></thead><tbody>';
+    body.forEach(r => {
+      html += '<tr>';
+      header.forEach((_, i) => {
+        const val = r[i] !== undefined ? r[i] : '';
+        const numeric = isNumeric(val);
+        const negative = numeric && parseFloat(val.replace(/,/g,'')) < 0;
+        html += `<td class="${numeric ? 'num' : ''} ${negative ? 'neg' : ''}">${escapeHtml(val)}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  // Always label this "Closing Balance" and always compute it from the actual running
+  // balance of the most recent transaction (by Entry #) — not from scanning the sheet
+  // for the text "CLOSING BALANCE", which can falsely match that phrase when it appears
+  // inside a transaction's own Reference/Mode of Payment columns (e.g. an OPENING entry
+  // whose Reference says "CLOSING BALANCE" and Mode of Payment says "CASH").
+  function renderLedgerTable(parsed, ledgerName){
+    const isComplete = selectedMonthKey === 'complete';
+    const balanceLabel = 'Closing Balance';
+    let rowsToShow = parsed.transactions;
+    const numericClosingBalance = latestBalanceOf(parsed.transactions);
+    let footTotals = { debit: parsed.totalDebit, credit: parsed.totalCredit, balance: numericClosingBalance };
+
+    if(!isComplete){
+      const [selYear, selMonth] = selectedMonthKey.split('-').map(Number);
+      rowsToShow = parsed.transactions.filter(t => {
+        const d = parseTxDate(t.date);
+        return d && d.year === selYear && d.month === selMonth;
+      });
+      if(rowsToShow.length === 0){
+        const label = getMonthOptions().find(o => o.key === selectedMonthKey).label;
+        return renderSummary({ title: parsed.title, balanceLabel }) + `<div class="state">No transactions found for ${escapeHtml(label)}.</div>`;
+      }
+      const debitSum = rowsToShow.reduce((sum, t) => sum + numVal(t.expenses), 0);
+      const creditSum = rowsToShow.reduce((sum, t) => sum + numVal(t.receipts), 0);
+      // Use the running balance carried by the most recent transaction of the selected
+      // month (by Entry #, not row position) — keeps the summary and totals row in sync
+      // with whichever month is selected, regardless of how the sheet rows are ordered.
+      footTotals = {
+        debit: fmtNum(debitSum),
+        credit: fmtNum(creditSum),
+        balance: latestBalanceOf(rowsToShow)
+      };
+    }
+
+    if(parsed.transactions.length === 0){
+      return renderSummary({ title: parsed.title, balanceLabel }) + `<div class="state">No transactions found in this ledger yet.</div>`;
+    }
+    // Always display rows oldest-first (opening balance at top, then ascending through
+    // time), regardless of how the underlying sheet is sorted.
+    rowsToShow = sortChronological(rowsToShow);
+    let html = renderSummary({
+      title: parsed.title,
+      totalDebit: footTotals.debit,
+      totalCredit: footTotals.credit,
+      closingBalance: footTotals.balance,
+      balanceLabel
+    });
+    const centerCols = ['expenses', 'receipts', 'balance'];
+    html += '<div class="table-scroll"><table class="ledger-table"><thead><tr>';
+    parsed.cols.forEach(c => html += `<th class="${centerCols.includes(c.key) ? 'center' : ''}">${escapeHtml(c.label)}</th>`);
+    html += '</tr></thead><tbody>';
+    rowsToShow.forEach(t => {
+      html += '<tr>';
+      parsed.cols.forEach(c => {
+        const val = t[c.key];
+        const numeric = ['expenses','receipts','balance'].includes(c.key);
+        const isDash = val === '-' || val === '';
+        html += `<td class="${numeric ? 'num' : ''}">${isDash ? '&mdash;' : escapeHtml(val)}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody>';
+    if(footTotals.debit || footTotals.credit || footTotals.balance){
+      html += `<tfoot><tr class="totals-row">`;
+      parsed.cols.forEach(c => {
+        let val = '';
+        if(c.key === 'desc') val = isComplete ? 'TOTAL' : 'MONTH TOTAL';
+        else if(c.key === 'expenses') val = footTotals.debit;
+        else if(c.key === 'receipts') val = footTotals.credit;
+        else if(c.key === 'balance') val = footTotals.balance;
+        const numeric = ['expenses','receipts','balance'].includes(c.key);
+        html += `<td class="${numeric ? 'num' : ''}">${escapeHtml(val)}</td>`;
+      });
+      html += '</tr></tfoot>';
+    }
+    html += '</table></div>';
+    return html;
+  }
+
+  function escapeHtml(str){
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function renderTabs(){
+    const tabsEl = document.getElementById('tabs');
+    tabsEl.innerHTML = LEDGERS.map((ledger, i) =>
+      `<div class="tab ${i === activeIndex ? 'active' : ''}" data-index="${i}">${escapeHtml(ledger.name)}</div>`
+    ).join('');
+    tabsEl.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        activeIndex = parseInt(tab.dataset.index, 10);
+        renderTabs();
+        renderPanel();
+        const ledger = LEDGERS[activeIndex];
+        if(!cache[ledger.gid] || cache[ledger.gid].error){
+          fetchLedger(ledger); // retry on click if missing or previously failed
+        }
+      });
+    });
+  }
+
+  function renderPanel(){
+    const panel = document.getElementById('panel');
+    const ledger = LEDGERS[activeIndex];
+    const entry = cache[ledger.gid];
+    if(entry && entry.error){
+      panel.innerHTML = `<div class="state error">Could not load "${escapeHtml(ledger.name)}".<br>${escapeHtml(entry.error)}<br><br>Click this tab again to retry.</div>`;
+      return;
+    }
+    if(!entry){
+      panel.innerHTML = `<div class="state"><div class="mark"></div>Fetching ${escapeHtml(ledger.name)}&hellip;</div>`;
+      return;
+    }
+    panel.innerHTML = entry.parsed.plain ? renderTable(entry.rows) : renderLedgerTable(entry.parsed, ledger.name);
+  }
+
+  function sleep(ms){ return new Promise(res => setTimeout(res, ms)); }
+
+  async function fetchLedger(ledger, attempt = 1){
+    try{
+      const res = await fetch(csvUrl(ledger.gid));
+      if(!res.ok) throw new Error(`Server responded ${res.status}`);
+      const text = await res.text();
+      if(text.trim().startsWith('<')){
+        throw new Error('Sheet not accessible. Check sharing is set to "Anyone with the link".');
+      }
+      const rows = parseCSV(text);
+      cache[ledger.gid] = { rows, parsed: parseLedgerSheet(rows) };
+    } catch(err){
+      if(attempt < 3){
+        await sleep(500 * attempt);
+        return fetchLedger(ledger, attempt + 1); // auto-retry transient network errors
+      }
+      cache[ledger.gid] = { error: err.message };
+    }
+    if(LEDGERS[activeIndex].gid === ledger.gid){ renderPanel(); }
+  }
+
+  async function fetchAll(){
+    document.getElementById('refreshBtn').disabled = true;
+    document.getElementById('lastUpdated').textContent = 'Refreshing…';
+    // Fetch one at a time (not all at once) so the browser/Google endpoint doesn't choke
+    for(const ledger of LEDGERS){
+      await fetchLedger(ledger);
+      await sleep(150);
+    }
+    renderPanel();
+    const now = new Date();
+    document.getElementById('lastUpdated').textContent = 'Updated ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    document.getElementById('refreshBtn').disabled = false;
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', fetchAll);
+
+  // Zoom controls: scale the ledger content without affecting the header
+  let zoomLevel = 100;
+  const zoomArea = document.getElementById('zoomArea');
+  const zoomLabel = document.getElementById('zoomLevel');
+  const MIN_ZOOM = 50, MAX_ZOOM = 150, STEP = 10;
+
+  function applyZoom(){
+    const scale = zoomLevel / 100;
+    zoomArea.style.zoom = scale; // supported in most modern browsers
+    if(typeof zoomArea.style.zoom === 'undefined' || !('zoom' in document.documentElement.style)){
+      // Fallback for browsers without CSS zoom support (e.g. older Firefox)
+      zoomArea.style.transform = `scale(${scale})`;
+      zoomArea.style.width = `${100 / scale}%`;
+    }
+    zoomLabel.textContent = zoomLevel + '%';
+  }
+
+  document.getElementById('zoomInBtn').addEventListener('click', () => {
+    zoomLevel = Math.min(MAX_ZOOM, zoomLevel + STEP);
+    applyZoom();
+  });
+  document.getElementById('zoomOutBtn').addEventListener('click', () => {
+    zoomLevel = Math.max(MIN_ZOOM, zoomLevel - STEP);
+    applyZoom();
+  });
+
+  // Auto-zoom to fit the device's screen orientation on load: 50% in portrait
+  // (narrow, tall screens), 90% in landscape (wide screens/rotated phones).
+  // Skipped while the manual "rotate to landscape" view is active, since that
+  // feature manages its own zoom level.
+  function autoZoomForOrientation(){
+    if(document.body.classList.contains('landscape-mode')) return;
+    const portrait = window.innerHeight >= window.innerWidth;
+    zoomLevel = portrait ? 50 : 90;
+    applyZoom();
+  }
+  autoZoomForOrientation();
+  window.addEventListener('resize', autoZoomForOrientation);
+
+  // Landscape mode: rotates the ledger content 90° so it reads sideways without
+  // needing to physically turn the phone.
+  const landscapeBtn = document.getElementById('landscapeBtn');
+  const landscapeToggleBtn = document.getElementById('landscapeToggleBtn');
+  let isLandscape = false;
+
+  function setLandscape(on){
+    isLandscape = on;
+    document.body.classList.toggle('landscape-mode', on);
+    landscapeBtn.classList.toggle('active', on);
+    landscapeToggleBtn.classList.toggle('active', on);
+    landscapeToggleBtn.innerHTML = on ? '&#8634; Exit landscape' : '&#8635; Landscape';
+    if(on){
+      zoomLevel = 90;
+      applyZoom();
+    }
+  }
+  landscapeBtn.addEventListener('click', () => setLandscape(true));
+  landscapeToggleBtn.addEventListener('click', () => setLandscape(!isLandscape));
+
+  renderTabs();
+  renderMonthControls();
+  renderPanel();
+  fetchAll();
+  setInterval(fetchAll, AUTO_REFRESH_MS);
+</script>
+</body>
+</html>
